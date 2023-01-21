@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const amqp = require('amqplib');
+const { query } = require("express");
 
 if (!process.env.RABBIT) {
     throw new Error("Please specify the name of the RabbitMQ host using environment variable RABBIT");
@@ -32,10 +33,10 @@ function connectRabbit() {
 //
 // Send the "viewed" to the history microservice.
 //
-function sendViewedMessage(messageChannel, videoPath) {
+function sendViewedMessage(messageChannel, videoPath, videoId) {
     console.log(`Publishing message on "viewed" exchange.`);
         
-    const msg = { videoPath: videoPath };
+    const msg = { videoPath: videoPath, videoId: videoId };
     const jsonMsg = JSON.stringify(msg);
     messageChannel.publish("viewed", "", Buffer.from(jsonMsg)); // Publish message to the "viewed" exchange.
 }
@@ -45,8 +46,14 @@ function sendViewedMessage(messageChannel, videoPath) {
 //
 function setupHandlers(app, messageChannel) {
     app.get("/video", (req, res) => { // Route for streaming video.
-
-        const videoPath = "./videos/SampleVideo_1280x720_1mb.mp4";
+        const videoId = req.query.id;
+        var videoPath = "";
+        if (videoId == "1") {
+            videoPath = "./videos/SampleVideo_1280x720_1mb.mp4";
+        } else if (videoId == "2") {
+            videoPath = "./videos/048918463-bank2mp4.mp4"
+        }
+       
         fs.stat(videoPath, (err, stats) => {
             if (err) {
                 console.error("An error occurred ");
@@ -61,7 +68,7 @@ function setupHandlers(app, messageChannel) {
     
             fs.createReadStream(videoPath).pipe(res);
 
-            sendViewedMessage(messageChannel, videoPath); // Send message to "history" microservice that this video has been "viewed".
+            sendViewedMessage(messageChannel, videoPath, videoId); // Send message to "history" microservice that this video has been "viewed".
         });
     });
 }
